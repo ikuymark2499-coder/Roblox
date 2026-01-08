@@ -1,6 +1,6 @@
 -- Darkdraft Script สำหรับ Delta Executor
 -- URL: https://raw.githubusercontent.com/ikuymark2499-coder/Roblox/refs/heads/main/Roblox.lua
--- ปรับปรุงโดย [Your Name]
+-- ปรับปรุงโดย [DarkDraft Studio]
 
 -- ตรวจสอบว่าใช้ Delta หรือไม่
 if not (identifyexecutor or getexecutorname) then
