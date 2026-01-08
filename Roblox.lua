@@ -56,55 +56,37 @@ end
 function StartFlying()
     local character = LocalPlayer.Character
     if not character then return end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
     
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
+    -- ลบของเก่า
+    local old = hrp:FindFirstChild("DarkdraftFly")
+    if old then old:Destroy() end
     
-    -- สร้าง BodyVelocity สำหรับการบิน
+    -- สร้างใหม่
     local bv = Instance.new("BodyVelocity")
     bv.Name = "DarkdraftFly"
-    bv.Parent = humanoidRootPart
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bv.Parent = hrp
+    bv.MaxForce = Vector3.new(100000, 100000, 100000)
+    bv.Velocity = Vector3.new(0,0,0)
     
     FlyConnection = RunService.Heartbeat:Connect(function()
-        if not Settings.Fly.Enabled or not character or not humanoidRootPart then
-            StopFlying()
-            return
-        end
+        if not Settings.Fly.Enabled then return end
         
         local camera = workspace.CurrentCamera
-        local forward = camera.CFrame.LookVector
-        local right = camera.CFrame.RightVector
-        local up = Vector3.new(0, 1, 0)
+        local move = Vector3.new(0,0,0)
         
-        local direction = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then move = move + camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then move = move - camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then move = move + camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then move = move - camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then move = move + Vector3.new(0,1,0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then move = move - Vector3.new(0,1,0) end
         
-        -- ควบคุมด้วยคีย์บอร์ด
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            direction = direction + forward
+        if move.Magnitude > 0 then
+            move = move.Unit * Settings.Fly.Speed
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            direction = direction - forward
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            direction = direction + right
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            direction = direction - right
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            direction = direction + up
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            direction = direction - up
-        end
-        
-        -- ปรับความเร็ว
-        if direction.Magnitude > 0 then
-            direction = direction.Unit * Settings.Fly.Speed
-        end
-        
-        bv.Velocity = direction
+        bv.Velocity = move
     end)
 end
 
@@ -116,12 +98,10 @@ function StopFlying()
     
     local character = LocalPlayer.Character
     if character then
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            local bv = humanoidRootPart:FindFirstChild("DarkdraftFly")
-            if bv then
-                bv:Destroy()
-            end
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local bv = hrp:FindFirstChild("DarkdraftFly")
+            if bv then bv:Destroy() end
         end
     end
 end
