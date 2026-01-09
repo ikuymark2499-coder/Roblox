@@ -1,13 +1,8 @@
--- Darkdraft Script สำหรับ Delta Executor
--- เวอร์ชัน: Complete 3.0 (ทุกฟังก์ชัน + แท็บระบบ + ใช้งานได้จริง)
+-- Darkdraft Script เวอร์ชันสมบูรณ์
+-- สำหรับ Delta Executor
 -- พัฒนาโดย [DarkDraft Stodio]
--- ตรวจสอบ Executor
-local executor = identifyexecutor or getexecutorname
-if executor then
-    print("✅ Executor: " .. executor())
-end
 
-print("🎮 Darkdraft Script กำลังโหลด...")
+print("🎮 Darkdraft Script Complete กำลังโหลด...")
 
 -- Services
 local Players = game:GetService("Players")
@@ -16,33 +11,27 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
--- Global Settings
-getgenv().Darkdraft = {
+-- Settings
+local Settings = {
     Fly = {Enabled = false, Speed = 50},
     Noclip = false,
     Invisible = false,
     ESP = false,
     WalkSpeed = 16,
     JumpPower = 50,
-    FlyConnection = nil,
-    NoclipConnection = nil,
     ESPObjects = {}
 }
 
--- Keybinds
-local Keybinds = {
-    ToggleFly = Enum.KeyCode.F,
-    ToggleNoclip = Enum.KeyCode.N,
-    ToggleInvisible = Enum.KeyCode.I,
-    ToggleESP = Enum.KeyCode.E,
-    ToggleUI = Enum.KeyCode.RightShift
+local Connections = {
+    Fly = nil,
+    Noclip = nil
 }
 
 -- ====================== FLY SYSTEM ======================
 function ToggleFly()
-    getgenv().Darkdraft.Fly.Enabled = not getgenv().Darkdraft.Fly.Enabled
+    Settings.Fly.Enabled = not Settings.Fly.Enabled
     
-    if getgenv().Darkdraft.Fly.Enabled then
+    if Settings.Fly.Enabled then
         StartFlying()
         print("🪽 Fly: เปิดใช้งานแล้ว")
     else
@@ -53,22 +42,35 @@ end
 
 function StartFlying()
     local character = LocalPlayer.Character
-    if not character then return end
+    if not character then 
+        warn("⚠️ ไม่พบ Character")
+        return 
+    end
     
     local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then return end
+    if not humanoidRootPart then 
+        warn("⚠️ ไม่พบ HumanoidRootPart")
+        return 
+    end
     
-    -- ลบส่วนประกอบเก่า
-    StopFlying()
+    -- ลบของเก่า
+    if Connections.Fly then
+        Connections.Fly:Disconnect()
+    end
     
-    -- สร้าง BodyVelocity สำหรับการบิน
+    local oldBV = humanoidRootPart:FindFirstChild("DarkdraftFly")
+    if oldBV then oldBV:Destroy() end
+    local oldGyro = humanoidRootPart:FindFirstChild("FlyGyro")
+    if oldGyro then oldGyro:Destroy() end
+    
+    -- สร้าง BodyVelocity
     local bv = Instance.new("BodyVelocity")
     bv.Name = "DarkdraftFly"
     bv.Parent = humanoidRootPart
     bv.MaxForce = Vector3.new(100000, 100000, 100000)
     bv.Velocity = Vector3.new(0, 0, 0)
     
-    -- สร้าง BodyGyro สำหรับรักษาทิศทาง
+    -- สร้าง BodyGyro
     local bg = Instance.new("BodyGyro")
     bg.Name = "FlyGyro"
     bg.Parent = humanoidRootPart
@@ -76,68 +78,66 @@ function StartFlying()
     bg.P = 10000
     bg.CFrame = humanoidRootPart.CFrame
     
-    getgenv().Darkdraft.FlyConnection = RunService.Heartbeat:Connect(function()
-        if not getgenv().Darkdraft.Fly.Enabled or not character or not humanoidRootPart then
-            return
-        end
+    -- Connection สำหรับควบคุม
+    Connections.Fly = RunService.Heartbeat:Connect(function()
+        if not Settings.Fly.Enabled then return end
         
         local camera = workspace.CurrentCamera
-        local direction = Vector3.new(0, 0, 0)
+        local move = Vector3.new(0, 0, 0)
         
-        -- การควบคุมทิศทาง
+        -- Controls
         if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            direction = direction + camera.CFrame.LookVector
+            move = move + camera.CFrame.LookVector
         end
         if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            direction = direction - camera.CFrame.LookVector
+            move = move - camera.CFrame.LookVector
         end
         if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            direction = direction + camera.CFrame.RightVector
+            move = move + camera.CFrame.RightVector
         end
         if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            direction = direction - camera.CFrame.RightVector
+            move = move - camera.CFrame.RightVector
         end
         if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            direction = direction + Vector3.new(0, 1, 0)
+            move = move + Vector3.new(0, 1, 0)
         end
         if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            direction = direction - Vector3.new(0, 1, 0)
+            move = move - Vector3.new(0, 1, 0)
         end
         
-        -- ปรับความเร็ว
-        if direction.Magnitude > 0 then
-            direction = direction.Unit * getgenv().Darkdraft.Fly.Speed
+        -- Apply speed
+        if move.Magnitude > 0 then
+            move = move.Unit * Settings.Fly.Speed
         end
         
-        bv.Velocity = direction
+        bv.Velocity = move
         bg.CFrame = camera.CFrame
     end)
 end
 
 function StopFlying()
-    if getgenv().Darkdraft.FlyConnection then
-        getgenv().Darkdraft.FlyConnection:Disconnect()
-        getgenv().Darkdraft.FlyConnection = nil
+    if Connections.Fly then
+        Connections.Fly:Disconnect()
+        Connections.Fly = nil
     end
     
     local character = LocalPlayer.Character
     if character then
-        local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-        if humanoidRootPart then
-            local bv = humanoidRootPart:FindFirstChild("DarkdraftFly")
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local bv = hrp:FindFirstChild("DarkdraftFly")
             if bv then bv:Destroy() end
-            
-            local bg = humanoidRootPart:FindFirstChild("FlyGyro")
+            local bg = hrp:FindFirstChild("FlyGyro")
             if bg then bg:Destroy() end
         end
     end
 end
 
--- ====================== NOCLIP SYSTEM (ทุกแมพ) ======================
+-- ====================== NOCLIP SYSTEM ======================
 function ToggleNoclip()
-    getgenv().Darkdraft.Noclip = not getgenv().Darkdraft.Noclip
+    Settings.Noclip = not Settings.Noclip
     
-    if getgenv().Darkdraft.Noclip then
+    if Settings.Noclip then
         StartNoclip()
         print("👻 Noclip: เปิดใช้งานแล้ว")
     else
@@ -147,13 +147,12 @@ function ToggleNoclip()
 end
 
 function StartNoclip()
-    -- ลบ Connection เก่า
-    if getgenv().Darkdraft.NoclipConnection then
-        getgenv().Darkdraft.NoclipConnection:Disconnect()
+    if Connections.Noclip then
+        Connections.Noclip:Disconnect()
     end
     
-    getgenv().Darkdraft.NoclipConnection = RunService.Stepped:Connect(function()
-        if not getgenv().Darkdraft.Noclip then return end
+    Connections.Noclip = RunService.Stepped:Connect(function()
+        if not Settings.Noclip then return end
         
         local character = LocalPlayer.Character
         if character then
@@ -167,9 +166,9 @@ function StartNoclip()
 end
 
 function StopNoclip()
-    if getgenv().Darkdraft.NoclipConnection then
-        getgenv().Darkdraft.NoclipConnection:Disconnect()
-        getgenv().Darkdraft.NoclipConnection = nil
+    if Connections.Noclip then
+        Connections.Noclip:Disconnect()
+        Connections.Noclip = nil
     end
     
     local character = LocalPlayer.Character
@@ -184,13 +183,13 @@ end
 
 -- ====================== INVISIBLE SYSTEM ======================
 function ToggleInvisible()
-    getgenv().Darkdraft.Invisible = not getgenv().Darkdraft.Invisible
+    Settings.Invisible = not Settings.Invisible
     
     local character = LocalPlayer.Character
     if character then
         for _, part in pairs(character:GetDescendants()) do
             if part:IsA("BasePart") then
-                if getgenv().Darkdraft.Invisible then
+                if Settings.Invisible then
                     part.Transparency = 0.8
                     if part:FindFirstChildWhichIsA("Decal") then
                         part:FindFirstChildWhichIsA("Decal").Transparency = 0.8
@@ -205,14 +204,14 @@ function ToggleInvisible()
         end
     end
     
-    print(getgenv().Darkdraft.Invisible and "🎭 Invisible: เปิดใช้งานแล้ว" or "🎭 Invisible: ปิดใช้งานแล้ว")
+    print(Settings.Invisible and "🎭 Invisible: เปิดใช้งานแล้ว" or "🎭 Invisible: ปิดใช้งานแล้ว")
 end
 
 -- ====================== ESP SYSTEM ======================
 function ToggleESP()
-    getgenv().Darkdraft.ESP = not getgenv().Darkdraft.ESP
+    Settings.ESP = not Settings.ESP
     
-    if getgenv().Darkdraft.ESP then
+    if Settings.ESP then
         CreateESP()
         print("👁️ ESP: เปิดใช้งานแล้ว")
     else
@@ -228,20 +227,20 @@ function CreateESP()
         if player ~= LocalPlayer then
             local character = player.Character
             if character then
-                local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-                if humanoidRootPart then
-                    -- สร้าง Highlight
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    -- Highlight
                     local highlight = Instance.new("Highlight")
-                    highlight.Name = "DarkdraftESP_" .. player.Name
+                    highlight.Name = "ESP_" .. player.Name
                     highlight.Parent = character
                     highlight.FillColor = Color3.fromRGB(255, 50, 50)
                     highlight.OutlineColor = Color3.fromRGB(255, 255, 0)
                     highlight.FillTransparency = 0.5
                     
-                    -- สร้าง Billboard สำหรับชื่อ
+                    -- Name Tag
                     local billboard = Instance.new("BillboardGui")
-                    billboard.Name = "DarkdraftName_" .. player.Name
-                    billboard.Parent = humanoidRootPart
+                    billboard.Name = "Name_" .. player.Name
+                    billboard.Parent = hrp
                     billboard.Size = UDim2.new(0, 200, 0, 50)
                     billboard.StudsOffset = Vector3.new(0, 3, 0)
                     billboard.AlwaysOnTop = true
@@ -255,7 +254,7 @@ function CreateESP()
                     textLabel.Font = Enum.Font.GothamBold
                     textLabel.TextSize = 14
                     
-                    getgenv().Darkdraft.ESPObjects[player.Name] = {highlight, billboard}
+                    Settings.ESPObjects[player.Name] = {highlight, billboard}
                 end
             end
         end
@@ -263,14 +262,14 @@ function CreateESP()
 end
 
 function ClearESP()
-    for _, objects in pairs(getgenv().Darkdraft.ESPObjects) do
+    for _, objects in pairs(Settings.ESPObjects) do
         for _, obj in ipairs(objects) do
             if obj then
                 obj:Destroy()
             end
         end
     end
-    getgenv().Darkdraft.ESPObjects = {}
+    Settings.ESPObjects = {}
 end
 
 -- ====================== PLAYER MODIFIERS ======================
@@ -280,7 +279,7 @@ function SetWalkSpeed(speed)
         local humanoid = character:FindFirstChild("Humanoid")
         if humanoid then
             humanoid.WalkSpeed = speed
-            getgenv().Darkdraft.WalkSpeed = speed
+            Settings.WalkSpeed = speed
             print("🚶 WalkSpeed: " .. speed)
         end
     end
@@ -292,40 +291,21 @@ function SetJumpPower(power)
         local humanoid = character:FindFirstChild("Humanoid")
         if humanoid then
             humanoid.JumpPower = power
-            getgenv().Darkdraft.JumpPower = power
+            Settings.JumpPower = power
             print("🦘 JumpPower: " .. power)
         end
     end
 end
 
-function ResetCharacter()
-    local character = LocalPlayer.Character
-    if character then
-        character:BreakJoints()
-        print("🔄 รีเซ็ตตัวละครแล้ว")
-    end
-end
-
 -- ====================== UI SYSTEM ======================
-local ScreenGui = nil
-local MainFrame = nil
-local TabButtons = {}
-local TabFrames = {}
-local ActiveTab = 1
-
-function CreateDarkdraftUI()
-    -- ลบ UI เก่าถ้ามี
-    if ScreenGui then
-        ScreenGui:Destroy()
-    end
-    
-    -- สร้าง ScreenGui หลัก
-    ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "DarkdraftUIV2"
+function CreateMainUI()
+    -- สร้าง ScreenGui
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "DarkdraftMainUI"
     ScreenGui.Parent = game.CoreGui
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     
-    -- ไอคอน DD ที่มุมขวาบน
+    -- DD Icon
     local DDIcon = Instance.new("TextButton")
     DDIcon.Name = "DDIcon"
     DDIcon.Text = "DD"
@@ -343,8 +323,8 @@ function CreateDarkdraftUI()
     corner.CornerRadius = UDim.new(1, 0)
     corner.Parent = DDIcon
     
-    -- เฟรมหลัก
-    MainFrame = Instance.new("Frame")
+    -- Main Frame
+    local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
     MainFrame.BorderColor3 = Color3.fromRGB(255, 50, 50)
@@ -358,7 +338,7 @@ function CreateDarkdraftUI()
     mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = MainFrame
     
-    -- หัวเรื่อง
+    -- Title
     local Title = Instance.new("TextLabel")
     Title.Text = "⚡ Darkdraft Complete ⚡"
     Title.Font = Enum.Font.GothamBold
@@ -368,106 +348,190 @@ function CreateDarkdraftUI()
     Title.Size = UDim2.new(1, 0, 0, 30)
     Title.Parent = MainFrame
     
+    -- Close Button
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Text = "X"
+    CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.TextSize = 14
+    CloseButton.TextColor3 = Color3.fromRGB(255, 50, 50)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    CloseButton.Position = UDim2.new(1, -30, 0, 0)
+    CloseButton.Size = UDim2.new(0, 30, 0, 30)
+    CloseButton.Parent = Title
+    
+    -- Container
+    local Container = Instance.new("Frame")
+    Container.BackgroundTransparency = 1
+    Container.Position = UDim2.new(0, 10, 0, 40)
+    Container.Size = UDim2.new(1, -20, 1, -50)
+    Container.Parent = MainFrame
+    
     -- Tab Bar
     local TabBar = Instance.new("Frame")
     TabBar.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
     TabBar.Size = UDim2.new(1, 0, 0, 30)
-    TabBar.Position = UDim2.new(0, 0, 0, 30)
-    TabBar.Parent = MainFrame
+    TabBar.Position = UDim2.new(0, 0, 0, -30)
+    TabBar.Parent = Container
     
-    -- Tab Container
-    local TabContainer = Instance.new("Frame")
-    TabContainer.BackgroundTransparency = 1
-    TabContainer.Position = UDim2.new(0, 10, 0, 70)
-    TabContainer.Size = UDim2.new(1, -20, 1, -80)
-    TabContainer.Parent = MainFrame
-    
-    -- สร้าง Tabs
-    local tabNames = {"⚡ หลัก", "👻 ฟังก์ชัน", "🎮 ผู้เล่น", "⚙️ ตั้งค่า"}
-    local tabColors = {
-        Color3.fromRGB(255, 100, 100),
-        Color3.fromRGB(100, 200, 255),
-        Color3.fromRGB(100, 255, 100),
-        Color3.fromRGB(255, 200, 100)
+    -- Create Tabs
+    local tabs = {
+        {"⚡ หลัก", Color3.fromRGB(255, 100, 100)},
+        {"🛠️ เครื่องมือ", Color3.fromRGB(100, 200, 255)},
+        {"🎮 ผู้เล่น", Color3.fromRGB(100, 255, 100)},
+        {"⚙️ ตั้งค่า", Color3.fromRGB(255, 200, 100)}
     }
     
-    -- สร้าง Tab Frames
+    local TabFrames = {}
+    local TabButtons = {}
+    
+    -- Create Tab Frames
     for i = 1, 4 do
         local tabFrame = Instance.new("Frame")
         tabFrame.Name = "Tab" .. i
         tabFrame.BackgroundTransparency = 1
         tabFrame.Size = UDim2.new(1, 0, 1, 0)
         tabFrame.Visible = (i == 1)
-        tabFrame.Parent = TabContainer
+        tabFrame.Parent = Container
         TabFrames[i] = tabFrame
     end
     
-    -- สร้าง Tab Buttons
-    for i = 1, 4 do
+    -- Create Tab Buttons
+    for i, tabInfo in ipairs(tabs) do
         local tabButton = Instance.new("TextButton")
-        tabButton.Text = tabNames[i]
+        tabButton.Text = tabInfo[1]
         tabButton.Font = Enum.Font.GothamBold
         tabButton.TextSize = 12
         tabButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-        tabButton.BackgroundColor3 = (i == 1) and tabColors[i] or Color3.fromRGB(60, 60, 60)
+        tabButton.BackgroundColor3 = (i == 1) and tabInfo[2] or Color3.fromRGB(60, 60, 60)
         tabButton.Size = UDim2.new(0.25, -2, 1, 0)
         tabButton.Position = UDim2.new((i-1) * 0.25, 0, 0, 0)
         tabButton.Parent = TabBar
         
         tabButton.MouseButton1Click:Connect(function()
-            SwitchTab(i)
+            for _, frame in pairs(TabFrames) do
+                frame.Visible = false
+            end
+            TabFrames[i].Visible = true
+            
+            for idx, btn in pairs(TabButtons) do
+                btn.BackgroundColor3 = (idx == i) and tabs[idx][2] or Color3.fromRGB(60, 60, 60)
+            end
         end)
         
         TabButtons[i] = tabButton
     end
     
-    -- ====================== TAB 1 (หลัก) ======================
+    -- ===== TAB 1 CONTENT =====
+    local function CreateToggle(parent, text, state, callback, yPos)
+        local frame = Instance.new("Frame")
+        frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+        frame.Size = UDim2.new(1, 0, 0, 40)
+        frame.Position = UDim2.new(0, 0, 0, yPos)
+        frame.Parent = parent
+        
+        local label = Instance.new("TextLabel")
+        label.Text = text
+        label.Font = Enum.Font.Gotham
+        label.TextSize = 13
+        label.TextColor3 = Color3.fromRGB(220, 220, 220)
+        label.BackgroundTransparency = 1
+        label.Size = UDim2.new(0.7, 0, 1, 0)
+        label.Parent = frame
+        
+        local button = Instance.new("TextButton")
+        button.Text = state and "ON" or "OFF"
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = 12
+        button.TextColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
+        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        button.Position = UDim2.new(0.75, 0, 0.15, 0)
+        button.Size = UDim2.new(0.2, 0, 0.7, 0)
+        button.Parent = frame
+        
+        button.MouseButton1Click:Connect(function()
+            callback()
+            button.Text = state and "ON" or "OFF"
+            button.TextColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
+        end)
+        
+        return button
+    end
+    
     -- Fly Toggle
-    local flyToggle = CreateToggleButton(TabFrames[1], "🪽 Fly (บิน)", getgenv().Darkdraft.Fly.Enabled, ToggleFly, 10)
+    local flyBtn = CreateToggle(TabFrames[1], "🪽 Fly (บิน)", Settings.Fly.Enabled, ToggleFly, 10)
     
     -- Speed Slider
-    local speedSlider = CreateSlider(TabFrames[1], "ความเร็วบิน", 20, 200, getgenv().Darkdraft.Fly.Speed, 60, function(value)
-        getgenv().Darkdraft.Fly.Speed = value
-    end)
+    local speedFrame = Instance.new("Frame")
+    speedFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    speedFrame.Size = UDim2.new(1, 0, 0, 60)
+    speedFrame.Position = UDim2.new(0, 0, 0, 60)
+    speedFrame.Parent = TabFrames[1]
+    
+    local speedLabel = Instance.new("TextLabel")
+    speedLabel.Text = "ความเร็วบิน: " .. Settings.Fly.Speed
+    speedLabel.Font = Enum.Font.Gotham
+    speedLabel.TextSize = 13
+    speedLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    speedLabel.BackgroundTransparency = 1
+    speedLabel.Size = UDim2.new(1, 0, 0, 30)
+    speedLabel.Parent = speedFrame
     
     -- Noclip Toggle
-    local noclipToggle = CreateToggleButton(TabFrames[1], "👻 Noclip (ทะลุ)", getgenv().Darkdraft.Noclip, ToggleNoclip, 110)
+    local noclipBtn = CreateToggle(TabFrames[1], "👻 Noclip (ทะลุ)", Settings.Noclip, ToggleNoclip, 130)
     
     -- Invisible Toggle
-    local invisibleToggle = CreateToggleButton(TabFrames[1], "🎭 Invisible (ล่องหน)", getgenv().Darkdraft.Invisible, ToggleInvisible, 160)
+    local invisibleBtn = CreateToggle(TabFrames[1], "🎭 Invisible (ล่องหน)", Settings.Invisible, ToggleInvisible, 180)
     
     -- ESP Toggle
-    local espToggle = CreateToggleButton(TabFrames[1], "👁️ ESP (มองผู้เล่น)", getgenv().Darkdraft.ESP, ToggleESP, 210)
+    local espBtn = CreateToggle(TabFrames[1], "👁️ ESP (มองผู้เล่น)", Settings.ESP, ToggleESP, 230)
     
-    -- ====================== TAB 2 (ฟังก์ชัน) ======================
-    CreateButton(TabFrames[2], "รีเซ็ตตัวละคร", 20, function()
-        ResetCharacter()
+    -- ===== TAB 2 CONTENT =====
+    local function CreateButton(parent, text, yPos, callback)
+        local button = Instance.new("TextButton")
+        button.Text = text
+        button.Font = Enum.Font.Gotham
+        button.TextSize = 13
+        button.TextColor3 = Color3.fromRGB(220, 220, 220)
+        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        button.Position = UDim2.new(0.1, 0, 0, yPos)
+        button.Size = UDim2.new(0.8, 0, 0, 35)
+        button.Parent = parent
+        
+        button.MouseButton1Click:Connect(callback)
+        return button
+    end
+    
+    CreateButton(TabFrames[2], "รีเซ็ตตัวละคร", 30, function()
+        LocalPlayer.Character:BreakJoints()
     end)
     
-    -- WalkSpeed Slider
-    CreateSlider(TabFrames[2], "ความเร็วเดิน", 16, 100, getgenv().Darkdraft.WalkSpeed, 70, function(value)
-        SetWalkSpeed(value)
+    CreateButton(TabFrames[2], "WalkSpeed x2", 80, function()
+        SetWalkSpeed(32)
     end)
     
-    -- JumpPower Slider
-    CreateSlider(TabFrames[2], "พลังกระโดด", 50, 200, getgenv().Darkdraft.JumpPower, 130, function(value)
-        SetJumpPower(value)
+    CreateButton(TabFrames[2], "JumpPower x2", 130, function()
+        SetJumpPower(100)
     end)
     
-    CreateButton(TabFrames[2], "ลบ ESP ทั้งหมด", 190, function()
-        ClearESP()
+    CreateButton(TabFrames[2], "รีเซ็ตค่าเดิน/กระโดด", 180, function()
+        SetWalkSpeed(16)
+        SetJumpPower(50)
     end)
     
-    -- ====================== TAB 3 (ผู้เล่น) ======================
-    CreateButton(TabFrames[3], "ESP ผู้เล่นทั้งหมด", 20, function()
+    -- ===== TAB 3 CONTENT =====
+    CreateButton(TabFrames[3], "ESP ผู้เล่นทั้งหมด", 30, function()
         ToggleESP()
     end)
     
-    -- ====================== TAB 4 (ตั้งค่า) ======================
-    CreateButton(TabFrames[4], "รีเซ็ตการตั้งค่า", 20, function()
-        getgenv().Darkdraft.Fly.Speed = 50
-        getgenv().Darkdraft.WalkSpeed = 16
-        getgenv().Darkdraft.JumpPower = 50
+    CreateButton(TabFrames[3], "ลบ ESP ทั้งหมด", 80, function()
+        ClearESP()
+    end)
+    
+    -- ===== TAB 4 CONTENT =====
+    CreateButton(TabFrames[4], "รีเซ็ตการตั้งค่า", 30, function()
+        Settings.Fly.Speed = 50
+        Settings.WalkSpeed = 16
+        Settings.JumpPower = 50
         SetWalkSpeed(16)
         SetJumpPower(50)
     end)
@@ -475,119 +539,91 @@ function CreateDarkdraftUI()
     CreateButton(TabFrames[4], "รีสตาร์ทสคริปต์", 80, function()
         ScreenGui:Destroy()
         wait(1)
-        CreateDarkdraftUI()
+        CreateMainUI()
     end)
     
-    CreateButton(TabFrames[4], "ปิด UI", 140, function()
-        MainFrame.Visible = false
-    end)
-    
-    -- ปุ่มปิด
-    local closeButton = Instance.new("TextButton")
-    closeButton.Text = "X"
-    closeButton.Font = Enum.Font.GothamBold
-    closeButton.TextSize = 14
-    closeButton.TextColor3 = Color3.fromRGB(255, 50, 50)
-    closeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    closeButton.Position = UDim2.new(1, -30, 0, 0)
-    closeButton.Size = UDim2.new(0, 30, 0, 30)
-    closeButton.Parent = Title
-    
-    closeButton.MouseButton1Click:Connect(function()
-        MainFrame.Visible = false
-    end)
-    
-    -- ระบบลากหน้าต่าง
-    SetupDragging(Title, MainFrame)
-    
-    -- อีเวนต์ไอคอน DD
+    -- UI Events
     DDIcon.MouseButton1Click:Connect(function()
         MainFrame.Visible = not MainFrame.Visible
+    end)
+    
+    CloseButton.MouseButton1Click:Connect(function()
+        MainFrame.Visible = false
+    end)
+    
+    -- Drag System
+    local dragging = false
+    local dragStart, startPos
+    
+    Title.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = MainFrame.Position
+        end
+    end)
+    
+    Title.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            local delta = input.Position - dragStart
+            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
     end)
     
     print("✅ UI โหลดสำเร็จ!")
 end
 
--- Helper Functions สำหรับ UI
-function CreateToggleButton(parent, text, initialState, callback, yPosition)
-    local frame = Instance.new("Frame")
-    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    frame.Size = UDim2.new(1, 0, 0, 40)
-    frame.Position = UDim2.new(0, 0, 0, yPosition)
-    frame.Parent = parent
-    
-    local label = Instance.new("TextLabel")
-    label.Text = text
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 13
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(0.7, 0, 1, 0)
-    label.Parent = frame
-    
-    local button = Instance.new("TextButton")
-    button.Text = initialState and "ON" or "OFF"
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 12
-    button.TextColor3 = initialState and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
-    button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    button.Position = UDim2.new(0.75, 0, 0.15, 0)
-    button.Size = UDim2.new(0.2, 0, 0.7, 0)
-    button.Parent = frame
-    
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 4)
-    corner.Parent = button
-    
-    button.MouseButton1Click:Connect(function()
-        callback()
-        button.Text = (text:find("Fly") and getgenv().Darkdraft.Fly.Enabled) or
-                     (text:find("Noclip") and getgenv().Darkdraft.Noclip) or
-                     (text:find("Invisible") and getgenv().Darkdraft.Invisible) or
-                     (text:find("ESP") and getgenv().Darkdraft.ESP) and "ON" or "OFF"
-        button.TextColor3 = (button.Text == "ON") and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 50, 50)
-    end)
-    
-    return button
-end
+-- ====================== KEYBINDS ======================
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.F then
+        ToggleFly()
+    elseif input.KeyCode == Enum.KeyCode.N then
+        ToggleNoclip()
+    elseif input.KeyCode == Enum.KeyCode.I then
+        ToggleInvisible()
+    elseif input.KeyCode == Enum.KeyCode.E then
+        ToggleESP()
+    elseif input.KeyCode == Enum.KeyCode.RightShift then
+        local ui = game.CoreGui:FindFirstChild("DarkdraftMainUI")
+        if ui then
+            local frame = ui:FindFirstChild("MainFrame")
+            if frame then
+                frame.Visible = not frame.Visible
+            end
+        end
+    end
+end)
 
-function CreateSlider(parent, text, min, max, defaultValue, yPosition, callback)
-    local frame = Instance.new("Frame")
-    frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    frame.Size = UDim2.new(1, 0, 0, 60)
-    frame.Position = UDim2.new(0, 0, 0, yPosition)
-    frame.Parent = parent
-    
-    local label = Instance.new("TextLabel")
-    label.Text = text .. ": " .. defaultValue
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 13
-    label.TextColor3 = Color3.fromRGB(220, 220, 220)
-    label.BackgroundTransparency = 1
-    label.Size = UDim2.new(1, 0, 0, 30)
-    label.Parent = frame
-    
-    local sliderFrame = Instance.new("Frame")
-    sliderFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    sliderFrame.Position = UDim2.new(0.1, 0, 0.5, 0)
-    sliderFrame.Size = UDim2.new(0.8, 0, 0, 20)
-    sliderFrame.Parent = frame
-    
-    local sliderFill = Instance.new("Frame")
-    sliderFill.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-    sliderFill.Size = UDim2.new((defaultValue - min) / (max - min), 0, 1, 0)
-    sliderFill.Parent = sliderFrame
-    
-    local sliderButton = Instance.new("TextButton")
-    sliderButton.Text = ""
-    sliderButton.BackgroundTransparency = 1
-    sliderButton.Size = UDim2.new(1, 0, 1, 0)
-    sliderButton.Parent = sliderFrame
-    
-    sliderButton.MouseButton1Down:Connect(function()
-        local connection
-        connection = RunService.RenderStepped:Connect(function()
-            local mouse = UserInputService:GetMouseLocation()
-            local sliderPos = sliderFrame.AbsolutePosition
-            local sliderSize = sliderFrame.AbsoluteSize
-        
+-- ====================== INITIALIZATION ======================
+CreateMainUI()
+
+-- Auto Reconnect
+LocalPlayer.CharacterAdded:Connect(function()
+    wait(2)
+    if Settings.Fly.Enabled then
+        ToggleFly()
+        wait(0.1)
+        ToggleFly()
+    end
+    if Settings.ESP then
+        ToggleESP()
+        wait(0.1)
+        ToggleESP()
+    end
+end)
+
+print("=========================================")
+print("🎮 Darkdraft Script Complete โหลดสำเร็จ!")
+print("=================================
