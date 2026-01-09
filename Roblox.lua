@@ -1,6 +1,5 @@
 -- Darkdraft Script เวอร์ชันสมบูรณ์
 -- สำหรับ Delta Executor
--- พัฒนาโดย [DarkDraft Stodio]
 
 print("🎮 Darkdraft Script Complete กำลังโหลด...")
 
